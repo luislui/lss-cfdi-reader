@@ -10,6 +10,7 @@ import type { CfdiRow } from './lib/cfdiParser'
 import type { ProcessError } from './components/FileUploader'
 import logoShort from './assets/images/logo_loeram_short.png'
 import './App.css'
+import { APP_VERSION } from './version'
 
 function App() {
   const [cfdis, setCfdis] = useState<CfdiRow[]>([])
@@ -56,6 +57,9 @@ function App() {
               <h1 className="m-0 text-2xl font-bold text-neutral-800 dark:text-neutral-100">
                 LSS lector de CFDIs
               </h1>
+              <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-500">
+                v{APP_VERSION}
+              </p>
               <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
                 Carga archivos XML de CFDIs y visualiza la información en tabla
               </p>
