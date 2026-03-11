@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx'
 import type { CfdiRow } from '../lib/cfdiParser'
 
 interface TableColumnExport {
@@ -26,8 +25,13 @@ function getExportValue(row: CfdiRow, colId: string): string | number {
 /**
  * Genera y descarga un Excel con los CFDIs: primera fila = encabezados,
  * filas de datos y última fila = totales para columnas numéricas.
+ * Usa importación dinámica de `xlsx` para que la librería solo se cargue al exportar.
  */
-export function exportTableToExcel(rows: CfdiRow[], columns: TableColumnExport[], filename = 'cfdis.xlsx'): void {
+export async function exportTableToExcel(
+  rows: CfdiRow[],
+  columns: TableColumnExport[],
+  filename = 'cfdis.xlsx',
+): Promise<void> {
   const headers = columns.map((c) => c.label)
   const dataRows: (string | number)[][] = rows.map((row) =>
     columns.map((col) => getExportValue(row, col.id))
@@ -52,6 +56,7 @@ export function exportTableToExcel(rows: CfdiRow[], columns: TableColumnExport[]
     aoa.push(totals)
   }
 
+  const XLSX = await import('xlsx')
   const ws = XLSX.utils.aoa_to_sheet(aoa)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'CFDIs')

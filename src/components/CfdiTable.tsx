@@ -344,7 +344,9 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
-          onClick={() => exportTableToExcel(sortedCfdis, columns, 'cfdis.xlsx')}
+          onClick={async () => {
+            await exportTableToExcel(sortedCfdis, columns, 'cfdis.xlsx')
+          }}
           className="inline-flex items-center gap-2 rounded-md border border-neutral-400 bg-neutral-100 px-3 py-1.5 text-sm text-neutral-800 shadow-sm transition-colors hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#63048C] focus:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600 dark:focus:ring-offset-neutral-900"
           title="Descargar tabla como Excel"
         >
