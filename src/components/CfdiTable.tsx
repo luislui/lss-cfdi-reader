@@ -236,6 +236,7 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
   const displayColumns = visibleColumns.length > 0 ? visibleColumns : columns
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [estadoFilter, setEstadoFilter] = useState<string>('')
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDirection>('asc')
   const [page, setPage] = useState(1)
@@ -249,16 +250,24 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
   const consultarCooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const filteredCfdis = useMemo(() => {
+    let list = cfdis
+    if (estadoFilter) {
+      list = list.filter((row) => {
+        const uuid = row.UUID?.trim()
+        const estado = uuid ? estadoByUuid[uuid] : undefined
+        return estado === estadoFilter
+      })
+    }
     const q = searchQuery.trim().toLowerCase()
-    if (!q) return cfdis
-    return cfdis.filter((row) =>
+    if (!q) return list
+    return list.filter((row) =>
       columns.some((c) => {
         const v = getCellDisplayValue(row, c.id, estadoByUuid)
         if (v === '—') return false
         return v.toLowerCase().includes(q)
       })
     )
-  }, [cfdis, searchQuery, columns, estadoByUuid])
+  }, [cfdis, searchQuery, estadoFilter, columns, estadoByUuid])
 
   const sortedCfdis = useMemo(() => {
     if (!sortKey) return filteredCfdis
@@ -362,25 +371,49 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
 
   return (
     <div className="space-y-3">
-      {/* Búsqueda global */}
-      <div className="relative">
-        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value)
-            setPage(1)
-          }}
-          placeholder="Buscar en todas las columnas..."
-          className="w-full rounded-lg border border-neutral-200 bg-white py-2.5 pl-10 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-[#63048C] focus:outline-none focus:ring-2 focus:ring-[#63048C]/20 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-[#b855e8] dark:focus:ring-[#b855e8]/25"
-          aria-label="Buscar en todas las columnas"
-        />
-        {searchQuery && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-500 dark:text-neutral-400">
-            {totalCount} resultado{totalCount !== 1 ? 's' : ''}
-          </span>
-        )}
+      {/* Barra de búsqueda con filtro de estado integrado */}
+      <div className="flex items-center overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-[#63048C]/20 focus-within:border-[#63048C] dark:border-neutral-600 dark:bg-neutral-800 dark:focus-within:border-[#b855e8] dark:focus-within:ring-[#b855e8]/25">
+        <div className="relative flex min-w-0 flex-1 items-center">
+          <SearchIcon className="pointer-events-none absolute left-3 h-4 w-4 text-neutral-400" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Buscar en todas las columnas..."
+            className="w-full min-w-0 border-0 bg-transparent py-2.5 pl-10 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-0 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+            aria-label="Buscar en todas las columnas"
+          />
+          {(searchQuery || estadoFilter) && (
+            <span className="absolute right-3 text-xs text-neutral-500 dark:text-neutral-400">
+              {totalCount} resultado{totalCount !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <div className="h-6 w-px shrink-0 bg-neutral-200 dark:bg-neutral-600" aria-hidden />
+        <div className="flex shrink-0 items-center px-2 py-1.5">
+          <label htmlFor="estado-filter" className="sr-only">
+            Filtrar por estado
+          </label>
+          <select
+            id="estado-filter"
+            value={estadoFilter}
+            onChange={(e) => {
+              setEstadoFilter(e.target.value)
+              setPage(1)
+            }}
+            className="border-0 bg-transparent py-1.5 pl-2 pr-7 text-sm text-neutral-800 focus:outline-none focus:ring-0 dark:text-neutral-100"
+            aria-label="Filtrar por estado del CFDI"
+          >
+            <option value="">Estado: Todos</option>
+            <option value="Vigente">Vigente</option>
+            <option value="Cancelado">Cancelado</option>
+            <option value="No encontrado">No encontrado</option>
+            <option value="Error">Error</option>
+          </select>
+        </div>
       </div>
 
       {/* Botones arriba de la tabla */}
