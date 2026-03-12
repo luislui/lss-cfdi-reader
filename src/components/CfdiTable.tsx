@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { CfdiRow } from '../lib/cfdiParser'
+import { consultaCfdiSat } from '../lib/satConsultaApi'
 import { exportTableToExcel } from '../utils/exportExcel'
 
 const DEFAULT_COL_WIDTH = 150
@@ -11,6 +12,7 @@ const DEFAULT_PAGE_SIZE = 50
 export type TableColumn = { id: string; label: string }
 
 const BASE_COLUMNS: TableColumn[] = [
+  { id: 'Estado', label: 'Estado' },
   { id: 'Version', label: 'Versión' },
   { id: 'Fecha', label: 'Fecha' },
   { id: 'Serie', label: 'Serie' },
@@ -126,9 +128,9 @@ function formatCellDisplay(raw: string, colId: string): string {
   return raw
 }
 
-function compareRows(a: CfdiRow, b: CfdiRow, key: string, dir: SortDirection): number {
-  const va = cellValue(a, key)
-  const vb = cellValue(b, key)
+function compareRows(a: CfdiRow, b: CfdiRow, key: string, dir: SortDirection, estadoByUuid?: Record<string, string>): number {
+  const va = key === 'Estado' && estadoByUuid ? (estadoByUuid[a.UUID ?? ''] ?? '') : cellValue(a, key)
+  const vb = key === 'Estado' && estadoByUuid ? (estadoByUuid[b.UUID ?? ''] ?? '') : cellValue(b, key)
   const sa = va === '—' ? '' : va
   const sb = vb === '—' ? '' : vb
   const cmp = sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' })
@@ -203,6 +205,32 @@ function SortIcon({ className, dir }: { className?: string; dir: SortDirection |
   )
 }
 
+function getCellDisplayValue(row: CfdiRow, colId: string, estadoByUuid: Record<string, string>): string {
+  if (colId === 'Estado') return estadoByUuid[row.UUID ?? ''] ?? '—'
+  return cellValue(row, colId)
+}
+
+const ESTADO_BADGE_CLASSES: Record<string, string> = {
+  Vigente:
+    'inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/30 dark:text-green-300 dark:ring-green-500/20',
+  Cancelado:
+    'inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-500/20',
+  'No encontrado':
+    'inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20 dark:bg-yellow-900/30 dark:text-yellow-300 dark:ring-yellow-500/20',
+  Error:
+    'inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-500/20',
+  'Consultando...':
+    'inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/20',
+}
+
+function EstadoBadge({ valor }: { valor: string }) {
+  if (valor === '—') return <span className="text-neutral-500 dark:text-neutral-400">—</span>
+  const badgeClass =
+    ESTADO_BADGE_CLASSES[valor] ??
+    'inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-500/20'
+  return <span className={badgeClass}>{valor}</span>
+}
+
 export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibility, onClearTable }: CfdiTableProps) {
   const visibleColumns = columns.filter((c) => !hiddenColumnIds.includes(c.id))
   const displayColumns = visibleColumns.length > 0 ? visibleColumns : columns
@@ -214,25 +242,30 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [resize, setResize] = useState<{ colId: string; startX: number; startWidth: number } | null>(null)
+  const [estadoByUuid, setEstadoByUuid] = useState<Record<string, string>>({})
+  const [isConsultando, setIsConsultando] = useState(false)
+  const [consultandoProgress, setConsultandoProgress] = useState<{ current: number; total: number } | null>(null)
+  const [consultarCooldownSeconds, setConsultarCooldownSeconds] = useState(0)
+  const consultarCooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const filteredCfdis = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return cfdis
     return cfdis.filter((row) =>
       columns.some((c) => {
-        const v = cellValue(row, c.id)
+        const v = getCellDisplayValue(row, c.id, estadoByUuid)
         if (v === '—') return false
         return v.toLowerCase().includes(q)
       })
     )
-  }, [cfdis, searchQuery, columns])
+  }, [cfdis, searchQuery, columns, estadoByUuid])
 
   const sortedCfdis = useMemo(() => {
     if (!sortKey) return filteredCfdis
     const arr = [...filteredCfdis]
-    arr.sort((a, b) => compareRows(a, b, sortKey, sortDir))
+    arr.sort((a, b) => compareRows(a, b, sortKey, sortDir, estadoByUuid))
     return arr
-  }, [filteredCfdis, sortKey, sortDir])
+  }, [filteredCfdis, sortKey, sortDir, estadoByUuid])
 
   const totalCount = sortedCfdis.length
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
@@ -272,6 +305,10 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
     if (safePage !== page) setPage(safePage)
   }, [totalCount, pageSize, safePage, page])
 
+  useEffect(() => {
+    if (cfdis.length === 0) setEstadoByUuid({})
+  }, [cfdis.length])
+
   const toggleSort = (colId: string) => {
     if (sortKey === colId) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else {
@@ -301,6 +338,12 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
       window.removeEventListener('mouseup', onUp)
     }
   }, [resize])
+
+  useEffect(() => {
+    return () => {
+      if (consultarCooldownIntervalRef.current) clearInterval(consultarCooldownIntervalRef.current)
+    }
+  }, [])
 
   const tableMinWidth =
     ROW_NUM_COL_WIDTH + displayColumns.reduce((sum, col) => sum + getColWidth(col.id), 0)
@@ -345,7 +388,71 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
         <button
           type="button"
           onClick={async () => {
-            await exportTableToExcel(sortedCfdis, columns, 'cfdis.xlsx')
+            const seen = new Set<string>()
+            const list: { uuid: string; rfc_emisor: string; rfc_receptor: string; total: string }[] = []
+            for (const row of cfdis) {
+              const uuid = row.UUID?.trim()
+              if (!uuid || seen.has(uuid)) continue
+              const currentEstado = estadoByUuid[uuid]
+              if (currentEstado === 'Vigente' || currentEstado === 'Cancelado') continue
+              seen.add(uuid)
+              const rfc_emisor = row.EmisorRfc?.trim() ?? ''
+              const rfc_receptor = row.ReceptorRfc?.trim() ?? ''
+              const totalNum = Number.parseFloat(String(row.Total ?? '').replace(/,/g, ''))
+              const total = Number.isNaN(totalNum) ? '0.00' : totalNum.toFixed(2)
+              list.push({ uuid, rfc_emisor, rfc_receptor, total })
+            }
+            if (list.length === 0) return
+            setIsConsultando(true)
+            setEstadoByUuid((prev) => {
+              const next = { ...prev }
+              for (const { uuid } of list) next[uuid] = 'Consultando...'
+              return next
+            })
+            setConsultandoProgress({ current: 0, total: list.length })
+            const promises = list.map((item) =>
+              consultaCfdiSat(item).then((estado) => ({ uuid: item.uuid, estado }))
+            )
+            const settled = await Promise.allSettled(promises)
+            const updates: Record<string, string> = {}
+            settled.forEach((result, i) => {
+              const uuid = list[i].uuid
+              updates[uuid] = result.status === 'fulfilled' ? result.value.estado : 'Error'
+            })
+            setEstadoByUuid((prev) => ({ ...prev, ...updates }))
+            setIsConsultando(false)
+            setConsultandoProgress(null)
+            if (consultarCooldownIntervalRef.current) clearInterval(consultarCooldownIntervalRef.current)
+            setConsultarCooldownSeconds(5)
+            consultarCooldownIntervalRef.current = setInterval(() => {
+              setConsultarCooldownSeconds((prev) => {
+                if (prev <= 1) {
+                  if (consultarCooldownIntervalRef.current) {
+                    clearInterval(consultarCooldownIntervalRef.current)
+                    consultarCooldownIntervalRef.current = null
+                  }
+                  return 0
+                }
+                return prev - 1
+              })
+            }, 1000)
+          }}
+          disabled={isConsultando || consultarCooldownSeconds > 0}
+          className="inline-flex items-center gap-2 rounded-md border border-neutral-400 bg-neutral-100 px-3 py-1.5 text-sm text-neutral-800 shadow-sm transition-colors hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#63048C] focus:ring-offset-1 disabled:opacity-60 dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600 dark:focus:ring-offset-neutral-900"
+          title="Consultar estado de cada CFDI en el SAT"
+        >
+          {consultandoProgress != null ? (
+            <>Consultando...</>
+          ) : consultarCooldownSeconds > 0 ? (
+            <span className="tabular-nums">Espere {consultarCooldownSeconds} s</span>
+          ) : (
+            <>Consultar en el SAT</>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            await exportTableToExcel(sortedCfdis, columns, 'cfdis.xlsx', estadoByUuid)
           }}
           className="inline-flex items-center gap-2 rounded-md border border-neutral-400 bg-neutral-100 px-3 py-1.5 text-sm text-neutral-800 shadow-sm transition-colors hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#63048C] focus:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600 dark:focus:ring-offset-neutral-900"
           title="Descargar tabla como Excel"
@@ -393,12 +500,12 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
               {displayColumns.map((col) => (
                 <th
                   key={col.id}
-                  className={`relative overflow-hidden bg-[#63048C]/5 align-middle dark:bg-[#b855e8]/10 ${isNumericColumn(col.id) ? 'text-right' : ''}`}
+                  className={`relative overflow-hidden bg-[#63048C]/5 align-middle dark:bg-[#b855e8]/10 ${col.id === 'Estado' ? 'text-center' : ''} ${isNumericColumn(col.id) ? 'text-right' : ''}`}
                 >
                   <button
                     type="button"
                     onClick={() => toggleSort(col.id)}
-                    className={`flex w-full min-w-0 items-center gap-1 overflow-hidden px-2 py-2 pr-6 text-xs font-bold uppercase tracking-wide text-[#63048C] hover:bg-[#63048C]/10 dark:text-white dark:hover:bg-[#b855e8]/15 ${isNumericColumn(col.id) ? 'justify-end text-right' : 'text-left'}`}
+                    className={`flex w-full min-w-0 items-center gap-1 overflow-hidden px-2 py-2 pr-6 text-xs font-bold uppercase tracking-wide text-[#63048C] hover:bg-[#63048C]/10 dark:text-white dark:hover:bg-[#b855e8]/15 ${col.id === 'Estado' ? 'justify-center' : isNumericColumn(col.id) ? 'justify-end text-right' : 'text-left'}`}
                     title="Ordenar por esta columna"
                   >
                     <span className="min-w-0 flex-1 truncate">{col.label}</span>
@@ -453,20 +560,23 @@ export function CfdiTable({ cfdis, columns, hiddenColumnIds, onOpenColumnVisibil
                     <td
                       key={col.id}
                       className={`align-middle border-r border-neutral-200 px-1.5 py-1 text-neutral-800 last:border-r-0 dark:border-neutral-600 dark:text-white ${
-                        isNumeric ? 'text-right tabular-nums' : ''
-                      } ${isFecha
+                        col.id === 'Estado' ? 'text-center' : ''
+                      } ${isNumeric ? 'text-right tabular-nums' : ''} ${isFecha
                           ? 'cursor-default transition-colors duration-200 hover:bg-[#63048C]/10 dark:hover:bg-[#b855e8]/15'
                           : ''
                       }`}
                     >
                       <span
                         className={`block overflow-hidden text-ellipsis whitespace-nowrap ${
-                          isFecha
+                          col.id === 'Estado' ? 'flex justify-center' : ''
+                        } ${isFecha
                             ? 'rounded px-0.5 transition-all duration-200 hover:scale-[1.03] hover:font-medium hover:text-[#63048C] hover:underline hover:decoration-[#63048C] hover:underline-offset-2 dark:hover:text-[#b855e8] dark:hover:decoration-[#b855e8]'
                             : ''
                         }`}
                       >
-                        {formatCellDisplay(cellValue(row, col.id), col.id)}
+                        {col.id === 'Estado'
+                          ? <EstadoBadge valor={getCellDisplayValue(row, col.id, estadoByUuid)} />
+                          : formatCellDisplay(cellValue(row, col.id), col.id)}
                       </span>
                     </td>
                   )})}

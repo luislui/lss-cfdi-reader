@@ -1,6 +1,8 @@
 # LSS Lector de CFDIs
 
-Visualizador de Comprobantes Fiscales Digitales por Internet (CFDI) del SAT (México). Carga archivos XML, muestra la información en tabla y permite exportar a Excel.
+Visualizador de Comprobantes Fiscales Digitales por Internet (CFDI) del SAT (México). Carga archivos XML, muestra la información en tabla, consulta el estado en el SAT y permite exportar a Excel.
+
+**Versión:** 1.1.0
 
 Desarrollado por [Loeram Software Solutions](https://www.loeramsoft.com).
 
@@ -19,9 +21,14 @@ Puedes usar la versión en línea en: [app.loeramsoft.com](https://app.loeramsof
 - **Búsqueda**: Filtra por cualquier columna visible.
 - **Ordenación**: Clic en el encabezado para ordenar (asc/desc).
 - **Visibilidad de columnas**: Mostrar u ocultar columnas; la preferencia se guarda en el navegador.
-- **Exportar a Excel**: Descarga un archivo `.xlsx` con los datos visibles (orden y filtro actuales) y fila de totales.
+- **Consulta estado en el SAT**: Columna Estado y botón para consultar cada CFDI en el SAT (vía backend). Vigente, Cancelado, No encontrado o Error; no se reconsultan los que ya están Vigente o Cancelado.
+- **Exportar a Excel**: Descarga un archivo `.xlsx` con los datos visibles (orden y filtro actuales), incluyendo el estado del CFDI si se consultó, y fila de totales.
 - **Tema claro/oscuro**: Con persistencia en `localStorage`.
 - **Duplicados**: Los comprobantes con el mismo UUID se resaltan en rojo.
+
+## Configuración (opcional)
+
+- **`VITE_LSS_SAT_STATUS_API_URL`**: URL base del backend de consulta de estado en el SAT (lssb-cfdi-satstatus). Si no se define, se usa el mismo origen (`/api/v1/sat/cfdi/status`). En local con el backend en otro puerto: `VITE_LSS_SAT_STATUS_API_URL=http://localhost:8080`.
 
 ## Requisitos
 
@@ -56,9 +63,11 @@ src/
 │   ├── CfdiTable.tsx       # Tabla, columnas dinámicas, export Excel
 │   ├── FileUploader.tsx    # Zona de arrastre y selección de XML
 │   ├── ColumnVisibilityModal.tsx
-│   └── ConfirmClearModal.tsx
+│   ├── ConfirmClearModal.tsx
+│   └── HelpModal.tsx        # Ayuda (consulta SAT, intermitencia, etc.)
 ├── lib/
-│   └── cfdiParser.ts       # Parser XML → datos del comprobante
+│   ├── cfdiParser.ts       # Parser XML → datos del comprobante
+│   └── satConsultaApi.ts   # Cliente al backend de consulta estado SAT (JSON)
 └── utils/
     ├── exportExcel.ts      # Exportación a .xlsx (xlsx/SheetJS)
     ├── cfdiColumnVisibility.ts

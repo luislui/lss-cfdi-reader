@@ -6,6 +6,7 @@ import { FileUploader } from './components/FileUploader'
 import { CfdiTable, getTableColumns } from './components/CfdiTable'
 import { ColumnVisibilityModal } from './components/ColumnVisibilityModal'
 import { ConfirmClearModal } from './components/ConfirmClearModal'
+import { HelpModal } from './components/HelpModal'
 import type { CfdiRow } from './lib/cfdiParser'
 import type { ProcessError } from './components/FileUploader'
 import logoShort from './assets/images/logo_loeram_short.png'
@@ -18,6 +19,7 @@ function App() {
   const [hiddenColumnIds, setHiddenColumnIdsState] = useState<string[]>(getHiddenColumnIds)
   const [columnVisibilityOpen, setColumnVisibilityOpen] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   const tableColumns = useMemo(() => getTableColumns(cfdis), [cfdis])
 
@@ -65,19 +67,31 @@ function App() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setDark((d) => !d)}
-            className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-            title={dark ? 'Modo claro' : 'Modo oscuro'}
-            aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          >
-            {dark ? (
-              <SunIcon className="w-5 h-5" />
-            ) : (
-              <MoonIcon className="w-5 h-5" />
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md border border-neutral-400 bg-neutral-100 px-3 py-1.5 text-sm text-neutral-800 shadow-sm transition-colors hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#63048C] focus:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600 dark:focus:ring-offset-neutral-900"
+              title="Ayuda"
+              aria-label="Abrir ayuda"
+            >
+              <HelpIcon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+              Ayuda
+            </button>
+            <button
+              type="button"
+              onClick={() => setDark((d) => !d)}
+              className="rounded-lg p-2 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              title={dark ? 'Modo claro' : 'Modo oscuro'}
+              aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {dark ? (
+                <SunIcon className="w-5 h-5" />
+              ) : (
+                <MoonIcon className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -119,6 +133,7 @@ function App() {
           }}
           onCancel={() => setClearConfirmOpen(false)}
         />
+        <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
         {columnVisibilityOpen && (
           <ColumnVisibilityModal
             columns={tableColumns.map((c) => ({ id: c.id, label: c.label }))}
@@ -167,6 +182,17 @@ function MoonIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
       <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+  )
+}
+
+/** Icono tipo HelpCircle (círculo con interrogación), mismo aspecto que lss-diot */
+function HelpIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
     </svg>
   )
 }

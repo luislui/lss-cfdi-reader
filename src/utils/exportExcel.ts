@@ -12,7 +12,15 @@ function isNumericColumn(colId: string): boolean {
   return NUMERIC_KEYWORDS.some((kw) => upper.includes(kw))
 }
 
-function getExportValue(row: CfdiRow, colId: string): string | number {
+function getExportValue(
+  row: CfdiRow,
+  colId: string,
+  estadoByUuid?: Record<string, string>,
+): string | number {
+  if (colId === 'Estado' && estadoByUuid) {
+    const estado = estadoByUuid[row.UUID ?? '']
+    return estado && estado !== '—' ? estado : ''
+  }
   const v = row[colId]
   if (v === undefined || v === '') return ''
   if (isNumericColumn(colId)) {
@@ -31,10 +39,11 @@ export async function exportTableToExcel(
   rows: CfdiRow[],
   columns: TableColumnExport[],
   filename = 'cfdis.xlsx',
+  estadoByUuid?: Record<string, string>,
 ): Promise<void> {
   const headers = columns.map((c) => c.label)
   const dataRows: (string | number)[][] = rows.map((row) =>
-    columns.map((col) => getExportValue(row, col.id))
+    columns.map((col) => getExportValue(row, col.id, estadoByUuid))
   )
 
   const aoa: (string | number)[][] = [headers, ...dataRows]
