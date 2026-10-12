@@ -39,7 +39,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           <section>
             <h3 className="mb-1 font-semibold text-neutral-900 dark:text-neutral-100">Carga de CFDIs</h3>
             <p className="mb-0">
-              Arrastra uno o varios archivos XML de CFDIs (versión 4.0) a la zona de carga o haz clic para
+              Arrastra uno o varios archivos XML de CFDIs (versión 3.3 o 4.0) a la zona de carga o haz clic para
               seleccionarlos. La tabla mostrará los datos del comprobante, emisor, receptor, totales e impuestos.
             </p>
           </section>

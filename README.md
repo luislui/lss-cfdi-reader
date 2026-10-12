@@ -2,7 +2,7 @@
 
 Visualizador de Comprobantes Fiscales Digitales por Internet (CFDI) del SAT (México). Carga archivos XML, muestra la información en tabla, consulta el estado en el SAT y permite exportar a Excel.
 
-**Versión:** 1.1.0
+**Versión:** 1.2.0
 
 Desarrollado por [Loeram Software Solutions](https://www.loeramsoft.com).
 
@@ -12,7 +12,7 @@ Puedes usar la versión en línea en: [app.loeramsoft.com](https://app.loeramsof
 
 ## Características
 
-- **Carga de XML**: Arrastra o selecciona uno o varios archivos `.xml` de CFDIs (versión 4.0).
+- **Carga de XML**: Arrastra o selecciona uno o varios archivos `.xml` de CFDIs (versión 3.3 o 4.0).
 - **Tabla interactiva**: Columnas de comprobante, emisor, receptor, totales, impuestos, etc.
 - **Columnas dinámicas**:
   - **Traslados**: Base e Impuesto por tasa (ej. Base (0.16), Impuesto (0.16)).
@@ -84,5 +84,5 @@ src/
 
 ## Formato soportado
 
-- CFDI 4.0 (namespace `http://www.sat.gob.mx/cfd/4`).
-- Se leen Comprobante, Emisor, Receptor, TimbreFiscalDigital, Impuestos (Traslados y Retenciones a nivel comprobante).
+- CFDI 4.0 (namespace `http://www.sat.gob.mx/cfd/4`) y CFDI 3.3 (namespace `http://www.sat.gob.mx/cfd/3`).
+- Se leen Comprobante, Emisor, Receptor, TimbreFiscalDigital, Impuestos (Traslados y Retenciones a nivel comprobante). En 3.3 la base del traslado se suma desde los conceptos, porque el comprobante no la incluye.
